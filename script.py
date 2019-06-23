@@ -1,8 +1,11 @@
 import mido
 import numpy as np
+from collections import Counter
 import pdb
 # first check file type
 # if mid.file == 1, one track per instrument
+
+notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
 mid = mido.MidiFile('data/1d9d16a9da90c090809c153754823c2b.mid')
 print('File type: {}'.format(mid.type))
@@ -14,22 +17,42 @@ for i, track in enumerate(mid.tracks):
 
   beats = []
   chords = {}
-  notes = set()
+  notes_on = set()
   beat_idx = 0
+
+  # cuenta cuántas veces se toca (note_on) cada nota:
+  note_on_count = np.zeros(len(notes), dtype=int)
+
   for msg in track:
     beat_idx += msg.time / tpb
     while beat_idx >= len(beats):
-      beats.append(notes.copy())
+      beats.append(notes_on.copy())
     if msg.type == 'note_on':
-      notes.add(msg.note)
+      notes_on.add(msg.note)
+      note_on_count[msg.note%12] += 1
     elif msg.type == 'note_off':
-      notes.remove(msg.note)
+      notes_on.remove(msg.note)
     else:
       print(msg)
-    chords[beat_idx] = notes.copy()
-    beats[-1] |= notes
+    chords[beat_idx] = notes_on.copy()
+    beats[-1] |= notes_on
 
   monophony = len([chord for chord in chords.values() if len(chord) < 2]) / len(chords)
+
+  # Nota mas frecuente (12 notas solamente)
+  # Puede ser (i) nota tocada más veces (note_on), o
+  max_note_on = ''.join([
+      notes[i] for i, count in enumerate(note_on_count)
+      if (count == max(note_on_count)) & (count > 0)
+  ])
+  # (ii) nota presente en la mayor cantidad de "acordes" (chords)
+  chord_note_count = Counter([
+      notes[note % 12] for chord in chords.values() for note in chord
+  ])
+  max_chord_note = ''.join(sorted([
+      note for note, count in chord_note_count.items()
+      if count == max(chord_note_count.values())
+  ]))
   pdb.set_trace()
 
 

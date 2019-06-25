@@ -57,7 +57,7 @@ class NoteTrack:
     self._notes_on = set()
     # cuenta cuántas veces se toca (note_on) cada nota:
     self.note_on_count = np.zeros(len(notes), dtype=int)
-    self.chords = {}
+    self.chords = {}  # similar a 'segments' en Echo Nest
     self.key_signatures = []  # declaradas en el archivo
 
   def chords2beats(self):
@@ -232,7 +232,7 @@ def parse_track(track_num, track, tpb, path=''):
         if 'key_signature' not in meta_tracks:
           meta_tracks['key_signature'] = MetaTrack()
         while beat_idx >= len(meta_tracks['key_signature'].beats):
-          meta_tracks['key_signature'].beats.append(key)
+          meta_tracks['key_signature'].beats.append(key)  # to-do: falta major/minor
         key = msg.key
         meta_tracks['key_signature'].beats[-1] = key
       elif msg.type == 'time_signature':

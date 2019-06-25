@@ -298,18 +298,29 @@ def int2note(note_int):
 def parse_file(path):
   import sys
   try:
-    midi_file = MidiFile(str(path))
+    midi_file = MidiFile(
+      str(path),
+      # clip=True
+    )
     if midi_file.type != 2:
       midi_file.read_tracks()
       midi_file.stringify()
     else:
       print('Error: Archivo tipo 2: ' + str(path))
   except OSError as err:
-    # to-do: algunos archivos fallan 'data byte must be in range 0..127'
+    # algunos archivos fallan con 'data byte must be in range 0..127'
+    # esto es porque al menos uno de sus data bytes es > 127
+    # en nuestra base de datos midi, para mensajes note_on y note_off
+    # son velocity > 127, y para program_change son program > 127
+    # Se puede usar MidiFile(path, clip=True), pero haría
+    # program > 127 -> 127 (https://github.com/mido/mido/issues/63)
     print('OSError: {}, {}'.format(err, path))
+  except ValueError as err:
+    # idem data_bytes > 127 en mensajes sysex
+    print('ValueError: {}, {}'.format(err, path))
   except KeyboardInterrupt:
     sys.exit()
-  except:
+  except as:
     print('Error inesperado, {}'.format(path))
   sys.stdout.flush()
 

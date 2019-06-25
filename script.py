@@ -22,7 +22,8 @@ meta_ignore = [
   'smpte_offset',
   'instrument_name',  # to-do: usar?
   'sequence_number',
-  'cue_marker'
+  'cue_marker',
+  'device_name'
 ]
 msg_ignore = [
   'sysex',
@@ -295,6 +296,7 @@ def int2note(note_int):
 
 
 def parse_file(path):
+  import sys
   try:
     midi_file = MidiFile(str(path))
     if midi_file.type != 2:
@@ -302,9 +304,14 @@ def parse_file(path):
       midi_file.stringify()
     else:
       print('Error: Archivo tipo 2: ' + str(path))
-  except:
+  except OSError as err:
     # to-do: algunos archivos fallan 'data byte must be in range 0..127'
-    print('Error: Imposible leer ' + str(path))
+    print('OSError: {}, {}'.format(err, path))
+  except KeyboardInterrupt:
+    sys.exit()
+  except:
+    print('Error inesperado, {}'.format(path))
+  sys.stdout.flush()
 
 
 if __name__ == '__main__':

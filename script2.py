@@ -294,5 +294,6 @@ with open(lmd.SCORE_FILE) as f:
             print(msd_id)
             print(traceback.format_exc())
         if file_count % 50 == 0:
+            sys.stdout.flush()
             write(file_count, grand_matrix)
 write(file_count, grand_matrix)

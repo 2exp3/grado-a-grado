@@ -232,7 +232,7 @@ def parse_track(track_num, track, tpb, path=''):
         if 'key_signature' not in meta_tracks:
           meta_tracks['key_signature'] = MetaTrack()
         while beat_idx >= len(meta_tracks['key_signature'].beats):
-          meta_tracks['key_signature'].beats.append(key)  # to-do: falta major/minor
+          meta_tracks['key_signature'].beats.append(key)
         key = msg.key
         meta_tracks['key_signature'].beats[-1] = key
       elif msg.type == 'time_signature':
@@ -320,7 +320,7 @@ def parse_file(path):
     print('ValueError: {}, {}'.format(err, path))
   except KeyboardInterrupt:
     sys.exit()
-  except as:
+  except:
     print('Error inesperado, {}'.format(path))
   sys.stdout.flush()
 

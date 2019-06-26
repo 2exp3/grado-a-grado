@@ -208,7 +208,7 @@ class MidiFile:
 
 
 def parse_track(track_num, track, tpb, path=''):
-  track_name = track.name.strip()
+  track_name = track.name.strip()  # to-do: usar rstrip también para remover \x00
   meta_tracks = {}
   note_tracks = {}
   beat_idx = 0

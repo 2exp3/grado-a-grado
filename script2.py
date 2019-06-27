@@ -165,9 +165,9 @@ class Song():
             csvfile.write('Año: ' + str(self.year) + '\n')
             csvfile.write('Tonalidad (Echo Nest): ' + self.key + '\n')
             # csvfile.write('Tempo: ' + self.best_bnc.)
-            pd.DataFrame(
-                self.adj_matrix
-            ).fillna(0).to_csv(csvfile)
+            df = pd.DataFrame(self.adj_matrix).fillna(0)
+            df = df.reindex(index=sorted(df.index), columns=sorted(df.columns))
+            df.to_csv(csvfile)
         # permite jugar con un tercer script que combina matrices
         # según género, año, etc
         # incluir cómo se obtuvo key
@@ -310,7 +310,8 @@ def normalize_beat(beat, key):
 
 
 def save(file_count, adj_matrix):
-    df = pd.DataFrame(grand_matrix).fillna(0)
+    df = pd.DataFrame(adj_matrix).fillna(0)
+    df = df.reindex(index=sorted(df.index), columns=sorted(df.columns))
     with open('grand_matrix.mat', 'w') as fileout:
         fileout.write('File count: ' + str(file_count) + '\n')
         df.to_csv(fileout)
@@ -331,7 +332,7 @@ with open(lmd.SCORE_FILE) as f:
             song = Song(msd_id, midis)
             grand_matrix = song.get_adj_matrix(grand_matrix)
             if song.adj_matrix is not None:
-                song.write_adj_matrix
+                song.write_adj_matrix()
                 file_count += 1
             else:
                 print(
@@ -359,4 +360,5 @@ with open(lmd.SCORE_FILE) as f:
             )
             t = time.time()
             sys.stderr.flush()
+            # pdb.set_trace()
 _ = save(file_count, grand_matrix)

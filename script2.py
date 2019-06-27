@@ -165,17 +165,9 @@ class Song():
             csvfile.write('Año: ' + str(self.year) + '\n')
             csvfile.write('Tonalidad (Echo Nest): ' + self.key + '\n')
             # csvfile.write('Tempo: ' + self.best_bnc.)
-            if self.adj_matrix is not None:
-                pd.DataFrame(
-                    self.adj_matrix
-                ).fillna(0).to_csv(csvfile)
-            else:
-                print(
-                    'Matriz de adyacencia vacía, ' +
-                    self.best_bnc.midi_file +
-                    '.mat',
-                    file=sys.stderr
-                )
+            pd.DataFrame(
+                self.adj_matrix
+            ).fillna(0).to_csv(csvfile)
         # permite jugar con un tercer script que combina matrices
         # según género, año, etc
         # incluir cómo se obtuvo key
@@ -338,8 +330,16 @@ with open(lmd.SCORE_FILE) as f:
         try:
             song = Song(msd_id, midis)
             grand_matrix = song.get_adj_matrix(grand_matrix)
-            song.write_adj_matrix
-            file_count += 1
+            if song.adj_matrix is not None:
+                song.write_adj_matrix
+                file_count += 1
+            else:
+                print(
+                    'Matriz de adyacencia vacía, ' +
+                    song.best_bnc.midi_file +
+                    '.mat',
+                    file=sys.stderr
+                )
         except KeyboardInterrupt:
             break
         except:

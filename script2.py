@@ -7,10 +7,17 @@ import numpy as np
 import pandas as pd
 import re
 import pdb, traceback, sys
+import time
 from script import notes, maj_scale
 
 
 keys = notes
+# en la tonalidad de do algunos sostenidos es mejor escribirlos como bemoles
+notes_C = {note: note for note in notes}
+notes_C['D#'] = 'Eb'
+notes_C['G#'] = 'Ab'
+notes_C['A#'] = 'Bb'
+
 min_scale = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0]
 rel_minors = {}
 for i, key in enumerate(keys):
@@ -19,29 +26,29 @@ for i, key in enumerate(keys):
 modes = ['minor', 'major']
 
 # intervals = ['P1', 'm2', 'M2', 'm3', 'M3', 'P4', 'TT', 'P5', 'm6', 'M6', 'm7', 'M7']
-nodes = []
-numerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii']
+# nodes = []
+# numerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii']
 # maj_triad = [0, 4, 7]
 # min_triad = [0, 3, 7]
-c_maj_scale = [note for i, note in enumerate(notes) if maj_scale[i]]
-c_min_scale = [note for i, note in enumerate(notes) if min_scale[i]]
-for i, numeral in enumerate(numerals):
-    nodes.append(
-        ''.join(
-            sorted(
-                np.roll(c_maj_scale, -i)[[0, 2, 4]]
-            )
-        )
-    )
-    nodes.append(
-        ''.join(
-            sorted(
-                np.roll(c_min_scale, -i)[[0, 2, 4]]
-            )
-        )
-    )
-nodes.append('*')  # otros acordes no especificados
-nodes.append('n')  # silencio
+# c_maj_scale = [note for i, note in enumerate(notes) if maj_scale[i]]
+# c_min_scale = [note for i, note in enumerate(notes) if min_scale[i]]
+# for i, numeral in enumerate(numerals):
+#     nodes.append(
+#         ''.join(
+#             sorted(
+#                 np.roll(c_maj_scale, -i)[[0, 2, 4]]
+#             )
+#         )
+#     )
+#     nodes.append(
+#         ''.join(
+#             sorted(
+#                 np.roll(c_min_scale, -i)[[0, 2, 4]]
+#             )
+#         )
+#     )
+# nodes.append('*')  # otros acordes no especificados
+# nodes.append('n')  # silencio
 
 family_ignore = ['Sound Effects']
 monophony_threshold = .8
@@ -71,7 +78,7 @@ class Song():
         self.best_bnc = self.get_best_bnc()  # se puede indicar umbral de score
         # alternativamente, podemos usar lista de bnc's (todos o subconjunto)
         self.key = self.get_key()
-        self.adj_matrix = self.get_adj_matrix()
+        # self.adj_matrix = self.get_adj_matrix()
 
     def get_best_bnc(self, score_threshold=0):
         # bnc del archivo midi con mejor score
@@ -107,7 +114,7 @@ class Song():
         # best_key major
         return self.key_echonest['key']
 
-    def get_adj_matrix(self):
+    def _get_adj_matrix(self):
         polyphonic_tracks = self.best_bnc.polyphonic
         if len(polyphonic_tracks) > 0:
             adj_matrix = pd.DataFrame(
@@ -117,16 +124,38 @@ class Song():
             )
             weight = 1 / len(polyphonic_tracks)
             for track in polyphonic_tracks:
-                track_adj_matrix = track.update_adj_matrix(
+                adj_matrix = track.update_adj_matrix(
                     adj_matrix, self.key, weight
                 )
-                if adj_matrix is None:
-                    adj_matrix = track_adj_matrix
-                else:
-                    adj_matrix += track_adj_matrix
         else:
             adj_matrix = None
         return adj_matrix
+
+    def get_adj_matrix(self, grand_matrix=None):
+        adj_matrices = {}
+        if grand_matrix is not None:
+            adj_matrices['grand_matrix'] = grand_matrix
+        polyphonic_tracks = self.best_bnc.polyphonic
+        if len(polyphonic_tracks) > 0:
+            adj_matrices['adj_matrix'] = {}
+            for track in polyphonic_tracks:
+                beats = track.beats['pitch_class']
+                weight = 1 / len(polyphonic_tracks) / len(beats)
+                for i, beat in enumerate(beats):
+                    if len(beats) > i + 1:
+                        from_beat = normalize_beat(beats[i], key)
+                        to_beat = normalize_beat(beats[i + 1], key)
+                        for adj_matrix in adj_matrices:
+                            if from_beat not in adj_matrices[adj_matrix]:
+                                adj_matrices[adj_matrix][from_beat] = {}
+                            if to_beat not in adj_matrices[adj_matrix][from_beat]:
+                                adj_matrices[adj_matrix][from_beat][to_beat] = 0
+                            adj_matrices[adj_matrix][from_beat][to_beat] += weight
+        else:
+            adj_matrices['adj_matrix'] = None
+        self.adj_matrix = adj_matrices['adj_matrix']
+        if grand_matrix is not None:
+            return adj_matrices['grand_matrix']
 
     def write_adj_matrix(self):
         fileout = self.best_bnc.midi_file + '.mat'
@@ -134,13 +163,18 @@ class Song():
             csvfile.write('Título: ' + self.title + '\n')
             csvfile.write('Artista: ' + self.artist + '\n')
             csvfile.write('Año: ' + str(self.year) + '\n')
+            csvfile.write('Tonalidad (Echo Nest): ' + self.key + '\n')
+            # csvfile.write('Tempo: ' + self.best_bnc.)
             if self.adj_matrix is not None:
-                self.adj_matrix.to_csv(csvfile)
+                pd.DataFrame(
+                    self.adj_matrix
+                ).fillna(0).to_csv(csvfile)
             else:
                 print(
-                    'Matriz de adyacencia vacía, ' + \
-                    self.best_bnc.midi_file + \
-                    '.mat'
+                    'Matriz de adyacencia vacía, ' +
+                    self.best_bnc.midi_file +
+                    '.mat',
+                    file=sys.stderr
                 )
         # permite jugar con un tercer script que combina matrices
         # según género, año, etc
@@ -235,7 +269,7 @@ class NoteTrack():
         else:
             self.is_empty = True
 
-    def update_adj_matrix(self, adj_matrix, key, weight=1):
+    def _update_adj_matrix(self, adj_matrix, key, weight=1):
         beats = self.beats['pitch_class']
         weight = weight / len(beats)  # tracks con len(beats) = 0 no llegan
         for i, beat in enumerate(beats):
@@ -257,7 +291,7 @@ def note2int(pitch_class, octave):
     return note_int
 
 
-def normalize_beat(beat, key):
+def _normalize_beat(beat, key):
     offset = keys.index(key)
     norm_beat = set()
     for pitch_class in beat:
@@ -267,33 +301,62 @@ def normalize_beat(beat, key):
     return norm_beat
 
 
-def write(file_count, grand_matrix):
-    # debug
+def normalize_beat(beat, key):
+    # lleva todo a tonalidad C
+    offset = keys.index(key)
+    norm_beat = set()
+    for pitch_class in beat:
+        norm_pitch_class = np.roll(notes, offset)[notes.index(pitch_class)]
+        norm_pitch_class = notes_C[norm_pitch_class]
+        norm_beat.add(norm_pitch_class)
+    if len(norm_beat) == 0:
+        # beat silencioso
+        norm_beat.add('n')
+    # norm_beat = ''.join([note for note in notes if note in norm_beat])
+    norm_beat = ''.join(sorted(norm_beat))
+    return norm_beat
+
+
+def save(file_count, adj_matrix):
+    df = pd.DataFrame(grand_matrix).fillna(0)
     with open('grand_matrix.mat', 'w') as fileout:
         fileout.write('File count: ' + str(file_count) + '\n')
-        grand_matrix.to_csv(fileout)
+        df.to_csv(fileout)
+    return len(df)
 
 
-grand_matrix = None
+grand_matrix = {}
+# to-do: la matriz para cada archivo no es tan grande
+# pero a medida que se van sumando sí (aunque debería aplanarse)
+# lo ideal sería trabajar con una matriz rala
+step = 50
 file_count = 0
 with open(lmd.SCORE_FILE) as f:
     scores = json.load(f)
+    t = time.time()
     for msd_id, midis in scores.items():
         try:
             song = Song(msd_id, midis)
-            song.write_adj_matrix()
-            if song.adj_matrix is not None:
-                file_count += 1
-                if grand_matrix is None:
-                    grand_matrix = song.adj_matrix
-                else:
-                    grand_matrix += song.adj_matrix
+            grand_matrix = song.get_adj_matrix(grand_matrix)
+            song.write_adj_matrix
+            file_count += 1
         except KeyboardInterrupt:
             break
         except:
-            print(msd_id)
-            print(traceback.format_exc())
-        if file_count % 50 == 0:
-            sys.stdout.flush()
-            write(file_count, grand_matrix)
-write(file_count, grand_matrix)
+            print(msd_id, file=sys.stderr)
+            print(traceback.format_exc(), file=sys.stderr)
+        if file_count % step == 0:
+            node_count = save(file_count, grand_matrix)
+            print(
+                'Se procesaron {} archivos en {:.2f} segundos. '
+                'Van {} archivos, y la matriz de adyacencia '
+                'tiene {} nodos!'.format(
+                    step,
+                    time.time() - t,
+                    file_count,
+                    node_count
+                )
+            )
+            t = time.time()
+            sys.stderr.flush()
+_ = save(file_count, grand_matrix)
